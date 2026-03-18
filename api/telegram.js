@@ -58,13 +58,20 @@ bot.start(async (ctx) => {
   }
 });
 
+// ... baaki puraana code ...
+
 // Vercel Serverless Handler
 module.exports = async (req, res) => {
   try {
-    await bot.handleUpdate(req.body);
-    res.status(200).send('OK');
+    // Ye zaroori hai taaki Telegram baar-baar message na bheje
+    if (req.body) {
+      await bot.handleUpdate(req.body);
+    }
+    res.status(200).send('OK'); // Ye line Telegram ko batati hai ki message mil gaya
   } catch (err) {
     console.error(err);
-    res.status(500).send('Error');
+    res.status(200).send('OK'); // Error hone par bhi OK bhejein taaki loop na bane
   }
 };
+
+
