@@ -1,124 +1,109 @@
 const { Telegraf } = require('telegraf');
 const admin = require('firebase-admin');
 
+// --- 1. CONFIGURATION ---
+const BOT_TOKEN = "7928266949:AAHqGiztgRNNGJ7u1jznA2ZuS98hshx8hXU"; // [cite: 2026-02-06]
+const ADMIN_ID = "5802852969"; //
+const FIREBASE_PROJECT_ID = "refer-erin"; //
+
 // Firebase Initialization
 if (!admin.apps.length) {
-  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
   admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-    projectId: "refer-erin" 
+    credential: admin.credential.cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)),
+    projectId: FIREBASE_PROJECT_ID
   });
 }
 
 const db = admin.firestore();
-const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
+const bot = new Telegraf(BOT_TOKEN);
 
-// --- 1. START COMMAND (Referral Logic) ---
+// --- 2. WELCOME LOGIC ---
+async function sendWelcome(ctx, userData, userId, userName) {
+  const inviteLink = `https://t.me/Refer_Erin_bot?start=${userId}`;
+  const miniAppUrl = `https://backend-reffer-blond.vercel.app/web/index.html`; //
+
+  const text = `Welcome ${userName}! ✨\n\n` +
+               `💰 **Balance:** ${userData.balance || 0} Points\n` +
+               `🔗 **Refer Link:**\n${inviteLink}\n\n` +
+               `Ek share par **50 points** kamayein! 🚀\n` +
+               `Nikaasi ke liye /withdraw likhein.`;
+
+  return ctx.replyWithMarkdown(text, {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: "🚀 Open Dashboard", web_app: { url: miniAppUrl } }],
+        [{ text: "📤 Share & Earn (50 Pts)", switch_inline_query: `Join now & earn! Link: ${inviteLink}` }]
+      ]
+    }
+  });
+}
+
+// --- 3. COMMANDS ---
+
+// Start Command (Referral Handling)
 bot.start(async (ctx) => {
   const userId = ctx.from.id.toString();
   const userName = ctx.from.first_name || "User";
   const referrerId = ctx.startPayload; 
-  const inviteLink = `https://t.me/Refer_Erin_bot?start=${userId}`;
+  const now = admin.firestore.FieldValue.serverTimestamp();
 
   try {
     const userRef = db.collection('users').doc(userId);
     const doc = await userRef.get();
 
     if (!doc.exists) {
-      // Naya user setup (Points: 0)
+      // New User Creation
       await userRef.set({
         uid: userId,
         name: userName,
         balance: 0,
+        referCount: 0,
         referredBy: (referrerId && referrerId !== userId) ? referrerId : null,
-        joinedAt: admin.firestore.FieldValue.serverTimestamp()
+        joinedAt: now
       });
 
-      // REFERRAL BONUS: Agar naya user kisi ke link se aaya hai
+      // Referral Bonus (50 pts)
       if (referrerId && referrerId !== userId) {
         const referrerRef = db.collection('users').doc(referrerId);
-        
-        // Referrer ko 50 points dena
         await referrerRef.update({
-          balance: admin.firestore.FieldValue.increment(50)
+          balance: admin.firestore.FieldValue.increment(50),
+          referCount: admin.firestore.FieldValue.increment(1)
         });
         
-        // Referrer ko notification bhejna
-        try {
-          await ctx.telegram.sendMessage(referrerId, `🎁 Badhai ho! ${userName} ne join kiya. Aapko 50 Points mile hain!`);
-        } catch (e) { console.log("Notification error"); }
+        try { await ctx.telegram.sendMessage(referrerId, `🎁 Badhai ho! ${userName} ne join kiya. Aapko 50 Points mile hain!`); } catch (e) {}
       }
     }
-
+    
     const userData = (await userRef.get()).data();
+    await sendWelcome(ctx, userData, userId, userName);
 
-    return ctx.reply(
-      `Welcome ${userName}! ✨\n\n` +
-      `💰 Aapka Balance: ${userData.balance} Points\n` +
-      `🔗 Referral Link: ${inviteLink}\n\n` +
-      `Ek share par 50 points kamayein! 🚀\n` +
-      `Nikaasi ke liye /withdraw likhein.`, 
-      {
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "🚀 Open App", web_app: { url: "https://refer-erin.web.app" } }],
-            [{ text: "📤 Share & Earn 50 Pts", switch_inline_query: `Join karein aur kamaayein! Link: ${inviteLink}` }]
-          ]
-        }
-      }
-    );
   } catch (error) {
-    console.error("Start Error:", error);
+    console.error("Error:", error);
+    ctx.reply("System busy, please try again.");
   }
 });
 
-// --- 2. WITHDRAW COMMAND ---
-bot.command('withdraw', async (ctx) => {
-  const userId = ctx.from.id.toString();
-  
-  try {
-    const userRef = db.collection('users').doc(userId);
-    const doc = await userRef.get();
-    const balance = doc.exists ? doc.data().balance : 0;
-
-    if (balance < 500) { // Minimum withdrawal limit (Aap badal sakte hain)
-      return ctx.reply(`❌ Withdrawal ke liye kam se kam 500 points chahiye. Aapka balance: ${balance}`);
-    }
-
-    // Withdrawal process start
-    return ctx.reply(`Aapke paas ${balance} points hain. Withdrawal ke liye apna UPI ID bhejye (Format: UPI id_yahan_likhein)`);
-  } catch (e) {
-    ctx.reply("Error processing withdrawal.");
-  }
-});
-
-// UPI ID sunne ke liye basic handler
+// Withdrawal Request
 bot.hears(/UPI (.+)/i, async (ctx) => {
   const upiId = ctx.match[1];
   const userId = ctx.from.id.toString();
-  
   const userRef = db.collection('users').doc(userId);
   const doc = await userRef.get();
-  const balance = doc.data().balance;
 
-  if (balance >= 500) {
-    // Database mein withdrawal request save karna
+  if (doc.exists && doc.data().balance >= 500) {
+    const amount = doc.data().balance;
     await db.collection('withdrawals').add({
-      userId: userId,
-      upi: upiId,
-      amount: balance,
-      status: 'pending',
-      timestamp: admin.firestore.FieldValue.serverTimestamp()
+      userId, upi: upiId, amount, status: 'pending', timestamp: admin.firestore.FieldValue.serverTimestamp()
     });
-
-    // Balance zero karna
     await userRef.update({ balance: 0 });
-
-    ctx.reply(`✅ Withdrawal request bhej di gayi hai!\nUPI: ${upiId}\nPoints: ${balance}\n24 ghante mein check karein.`);
+    ctx.reply(`✅ Request Sent! Amount: ${amount}\nAdmin jald hi process karega.`);
+    await ctx.telegram.sendMessage(ADMIN_ID, `🚨 NEW PAYOUT!\nUser: ${userId}\nUPI: ${upiId}\nAmount: ${amount}`);
+  } else {
+    ctx.reply("❌ Minimum 500 points required for withdrawal.");
   }
 });
 
-// Vercel Handler
+// --- 4. EXPORT FOR VERCEL ---
 module.exports = async (req, res) => {
   try {
     if (req.body) await bot.handleUpdate(req.body);
