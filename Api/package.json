@@ -1,9 +1,0 @@
-{
-  "name": "refer-erin-bot",
-  "version": "1.0.0",
-  "main": "api/telegram.js",
-  "dependencies": {
-    "telegraf": "^4.12.2",
-    "firebase-admin": "^11.5.0"
-  }
-}
