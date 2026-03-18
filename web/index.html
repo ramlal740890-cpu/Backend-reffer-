@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trendmansun Rewards Dashboard</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-storage-compat.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root { --primary-bg: #0a0e17; --card-bg: #111827; --text-color: #f3f4f6; --neon-blue: #00d2ff; --neon-green: #05ffa1; --grey: #6b7280; --orange: #ff6b6b; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--primary-bg); color: var(--text-color); margin: 0; padding: 20px; text-align: center; }
+        .container { max-width: 600px; margin: auto; padding-bottom: 20px; }
+        
+        /* Profile Header */
+        .profile-header { display: flex; align-items: center; justify-content: space-between; background: var(--card-bg); padding: 15px; border-radius: 20px; border: 1px solid #1f2937; margin-bottom: 20px; position: relative; }
+        #photoWrapper { position: relative; width: 60px; height: 60px; }
+        #userPhoto { width: 100%; height: 100%; border-radius: 50%; border: 3px solid var(--neon-blue); object-fit: cover; }
+        #editPhotoBtn { position: absolute; bottom: 0; right: 0; background: var(--neon-blue); color: #fff; width: 22px; height: 22px; border-radius: 50%; border: none; font-size: 12px; cursor: pointer; display: none; }
+        .profile-info { text-align: left; flex-grow: 1; margin-left: 15px; }
+        #userName { font-size: 18px; font-weight: bold; }
+        #joinedAt { font-size: 12px; color: var(--grey); margin-top: 3px; }
+        
+        /* Auto Banner Ad */
+        .banner-ad { width: 100%; height: 60px; background: #000; border-radius: 10px; border: 1px solid var(--orange); overflow: hidden; margin-bottom: 20px; box-shadow: 0 0 10px rgba(255,107,107,0.3); }
+        .banner-ad iframe { width: 100%; height: 100%; border: none; }
+
+        /* Stats Grid */
+        .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 20px; }
+        .stat-card { background: var(--card-bg); padding: 20px; border-radius: 15px; border: 1px solid #1f2937; transition: 0.3s; }
+        .stat-card:hover { border-color: var(--neon-blue); box-shadow: 0 0 15px rgba(0,210,255,0.3); }
+        .stat-icon { font-size: 30px; color: var(--neon-blue); margin-bottom: 10px; }
+        .stat-value { font-size: 28px; font-weight: bold; color: var(--neon-blue); }
+        .stat-label { font-size: 12px; color: var(--grey); text-transform: uppercase; margin-top: 5px; }
+        
+        /* Action Buttons */
+        .action-card { background: var(--card-bg); padding: 25px; border-radius: 20px; border: 1px solid #1f2937; margin-bottom: 20px; }
+        .btn { border: none; padding: 15px; border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.3s; color: white; margin-top: 10px; text-decoration: none; display: flex; align-items: center; justify-content: center; width: 100%; }
+        .btn-blue { background: linear-gradient(45deg, var(--neon-blue), #3a7bd5); }
+        .btn-green { background: linear-gradient(45deg, var(--neon-green), #2ecc71); }
+        .btn-ad { background: linear-gradient(45deg, var(--orange), #c0392b); }
+        .btn:active { transform: scale(0.98); }
+        .btn i { margin-right: 10px; }
+        
+        /* Refer & Input */
+        input { width: 100%; padding: 12px; background: #1f2937; border-radius: 10px; border: 1px solid #374151; color: white; box-sizing: border-box; font-size: 14px; margin-top: 15px; text-align: center; }
+        .share-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; }
+        .btn-whatsapp { background: #25D366; }
+        .btn-telegram { background: #0088cc; }
+        
+        /* Live Time & Date */
+        .live-info { font-size: 14px; color: var(--grey); margin-bottom: 30px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="live-info" id="liveTime">Loading Time...</div>
+
+        <div class="profile-header">
+            <div id="photoWrapper">
+                <img id="userPhoto" src="https://via.placeholder.com/60" alt="Profile">
+                <button id="editPhotoBtn" onclick="selectPhoto()"><i class="fas fa-camera"></i></button>
+                <input type="file" id="photoInput" accept="image/*" style="display:none;" onchange="uploadPhoto(this.files)">
+            </div>
+            <div class="profile-info">
+                <div id="userName">User Profile</div>
+                <div id="joinedAt">Joined: Loading...</div>
+            </div>
+            <i class="fas fa-crown" style="color: var(--neon-blue); font-size: 20px;"></i>
+        </div>
+
+        <div class="banner-ad">
+            <iframe id="bannerAdFrame" src=""></iframe>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <i class="fas fa-wallet stat-icon"></i>
+                <div class="stat-value" id="balanceVal">0</div>
+                <div class="stat-label">Your Points</div>
+            </div>
+            <div class="stat-card">
+                <i class="fas fa-users stat-icon"></i>
+                <div class="stat-value" id="refersVal">0</div>
+                <div class="stat-label">Total Refers (50 pts)</div>
+            </div>
+        </div>
+
+        <div class="action-card">
+            <h3><i class="fas fa-calendar-check" style="color: var(--neon-green);"></i> Daily Bonus (10 Points)</h3>
+            <p style="font-size: 12px; color: var(--grey);">Claim once per day! points instantly added.</p>
+            <button class="btn btn-green" id="dailyBtn" onclick="claimDaily()">
+                <i class="fas fa-gift"></i> Claim Daily 10 Points
+            </button>
+            <div id="timer" style="font-size: 14px; margin-top: 10px; color: var(--neon-green); display:none;">Available in 23:59:59</div>
+        </div>
+
+        <div class="action-card">
+            <h3><i class="fas fa-share-alt" style="color: var(--neon-blue);"></i> Refer Friends (50 Points)</h3>
+            <p style="font-size: 12px; color: var(--grey);">Share link below. Earn points per user.</p>
+            <input type="text" id="inviteInput" readonly value="https://t.me/Refer_Erin_bot?start=123">
+            <div class="share-buttons">
+                <a href="#" target="_blank" id="waShare" class="btn btn-whatsapp"><i class="fab fa-whatsapp"></i> WhatsApp</a>
+                <a href="#" target="_blank" id="tgShare" class="btn btn-telegram"><i class="fab fa-telegram-plane"></i> Telegram</a>
+            </div>
+        </div>
+
+        <div class="action-card">
+            <h3>Extra Points (Ad)</h3>
+            <a href="https://horizontallyresearchpolar.com/g1wajyi32d?key=98b95e4c7b29a083b3ce18c6145d5eb6" target="_blank" class="btn btn-ad">
+                <i class="fas fa-tv"></i> Watch Ad (10 Points)
+            </a>
+            <hr style="border: 0.5px solid #1f2937; margin-top: 20px;">
+            <input type="text" id="upiId" placeholder="example@upi for withdrawal">
+            <button class="btn btn-blue" onclick="sendWithdraw()">
+                <i class="fas fa-paper-plane"></i> Request Withdrawal
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        // --- 1. CONFIGURATION ---
+        const firebaseConfig = { projectId: "refer-erin" }; //
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const storage = firebase.storage(); // Photo upload ke liye
+
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.enableClosingConfirmation();
+        const user = tg.initDataUnsafe.user;
+        const AD_LINK = "https://horizontallyresearchpolar.com/g1wajyi32d?key=98b95e4c7b29a083b3ce18c6145d5eb6";
+
+        // --- 2. USER PROFILE LOAD ---
+        if (user) {
+            document.getElementById('userName').innerText = (user.first_name || 'User') + " " + (user.last_name || '');
+            document.getElementById('editPhotoBtn').style.display = 'block'; // Photo edit button dikhana
+            
+            const userRef = db.collection("users").doc(user.id.toString());
+            const inviteUrl = `https://t.me/Refer_Erin_bot?start=${user.id}`;
+            document.getElementById('inviteInput').value = inviteUrl;
+            
+            // Share text setup
+            const text = `Join now and earn rewards! Link: ${inviteUrl}`;
+            document.getElementById('waShare').href = `whatsapp://send?text=${encodeURIComponent(text)}`;
+            document.getElementById('tgShare').href = `tg://msg?text=${encodeURIComponent(text)}`;
+
+            // Load Firebase Data (Points, Photo, joinedAt)
+            userRef.onSnapshot((doc) => {
+                if (doc.exists) {
+                    const data = doc.data();
+                    document.getElementById('balanceVal').innerText = data.balance || 0;
+                    document.getElementById('refersVal').innerText = data.referCount || 0;
+                    
+                    // Profile Photo (Firebase mein uploaded ya Telegram ki default)
+                    if(data.photoUrl) { document.getElementById('userPhoto').src = data.photoUrl; } 
+                    else if(user.photo_url) { document.getElementById('userPhoto').src = user.photo_url; }
+
+                    if(data.joinedAt) {
+                      const joinedDate = new Date(data.joinedAt.seconds * 1000).toLocaleDateString('en-IN');
+                      document.getElementById('joinedAt').innerText = `Joined: ${joinedDate}`;
+                    }
+                }
+            });
+        }
+
+        // --- 3. PHOTO UPLOAD LOGIC ---
+        function selectPhoto() { document.getElementById('photoInput').click(); }
+
+        async function uploadPhoto(files) {
+          if(!user || files.length === 0) return;
+          const file = files[0];
+          const userPhotoRef = storage.ref().child(`user_photos/${user.id}_profile.jpg`);
+          const userRef = db.collection("users").doc(user.id.toString());
+
+          tg.MainButton.setText("Uploading Photo...").show().disable();
+          
+          try {
+            await userPhotoRef.put(file); // Upload karna
+            const downloadUrl = await userPhotoRef.getDownloadURL(); // URL lena
+            await userRef.update({ photoUrl: downloadUrl }); // Firestore update
+            tg.MainButton.setText("Photo Updated! ✅").show();
+            setTimeout(() => tg.MainButton.hide(), 2000);
+          } catch (e) {
+            console.error(e);
+            alert("Photo upload failed.");
+            tg.MainButton.hide();
+          }
+        }
+
+        // --- 4. DAILY BONUS LOGIC (10 Points) ---
+        function claimDaily() {
+          if(!user) return;
+          const userRef = db.collection("users").doc(user.id.toString());
+          const now = Date.now();
+          const oneDay = 24 * 60 * 60 * 1000;
+
+          userRef.get().then(doc => {
+            const lastClaim = (doc.exists && doc.data().lastDailyBonus) ? doc.data().lastDailyBonus : 0;
+            
+            if(now - lastClaim < oneDay) {
+              alert("Wait 24 hours to claim again.");
+            } else {
+              userRef.update({
+                balance: firebase.firestore.FieldValue.increment(10),
+                lastDailyBonus: now
+              }).then(() => {
+                alert("🎁 10 Points Daily Bonus Added!");
+              });
+            }
+          });
+        }
+
+        // --- 5. TIME & DATE & AUTO BANNER AD (every 5 seconds) ---
+        function updateLiveInfo() {
+          const now = new Date();
+          const options = { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' };
+          document.getElementById('liveTime').innerText = now.toLocaleString('en-IN', options);
+          
+          // Auto Refresh Banner Ad
+          document.getElementById('bannerAdFrame').src = AD_LINK;
+        }
+        updateLiveInfo(); // Instant load
+        setInterval(updateLiveInfo, 5000); // 5-second cycle
+
+        // --- 6. WITHDRAWAL REQUEST ---
+        function sendWithdraw() {
+          const upi = document.getElementById('upiId').value;
+          if(!upi || upi.length < 5) return alert("Enter correct UPI ID.");
+          tg.sendData("UPI " + upi); // Bot ko bhejna
+          tg.close();
+        }
+    </script>
+</body>
+</html>
