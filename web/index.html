@@ -108,10 +108,8 @@
         </div>
 
         <div class="action-card">
-            <h3>Extra Points (Ad)</h3>
-            <a href="https://horizontallyresearchpolar.com/g1wajyi32d?key=98b95e4c7b29a083b3ce18c6145d5eb6" target="_blank" class="btn btn-ad">
-                <i class="fas fa-tv"></i> Watch Ad (10 Points)
-            </a>
+            <button id="watchAdBtn" class="btn-ad"><i class="fas fa-tv"></i> Watch Ad (10 Points)</button>
+
             <hr style="border: 0.5px solid #1f2937; margin-top: 20px;">
             <input type="text" id="upiId" placeholder="example@upi for withdrawal">
             <button class="btn btn-blue" onclick="sendWithdraw()">
@@ -233,6 +231,62 @@
           tg.sendData("UPI " + upi); // Bot ko bhejna
           tg.close();
         }
+        // --- 7. WATCH AD & EARN POINTS ---
+async function watchAd() {
+    if (!user) return alert("User not found!");
+    
+    const adBtn = document.getElementById('watchAdBtn');
+    
+    // 1. Ad open karein
+    window.open(AD_LINK, '_blank');
+    
+    // 2. Points update karein (Firestore mein)
+    adBtn.disabled = true;
+    adBtn.innerText = "Adding Points...";
+
+    try {
+        const userRef = db.collection("users").doc(user.id.toString());
+        await userRef.update({
+            balance: firebase.firestore.FieldValue.increment(10)
+        });
+        alert("🎁 10 Points added for watching ad!");
+    } catch (e) {
+        console.error("Ad Error:", e);
+        alert("Points update failed!");
+    } finally {
+        adBtn.disabled = false;
+        adBtn.innerHTML = '<i class="fas fa-tv"></i> Watch Ad (10 Points)';
+    }
+}
+
+// --- 8. FIXED WITHDRAWAL REQUEST (No Exit Error) ---
+async function sendWithdraw() {
+    const upi = document.getElementById('upiId').value;
+    const balance = parseInt(document.getElementById('balanceVal').innerText);
+
+    if (!upi || upi.length < 5) return alert("Enter correct UPI ID.");
+    if (balance < 100) return alert("Minimum 100 points required for withdrawal!");
+
+    try {
+        // Data Firebase 'withdrawals' collection mein save karein
+        await db.collection("withdrawals").add({
+            userId: user.id,
+            userName: user.first_name,
+            upi: upi,
+            amount: balance,
+            status: "pending",
+            date: new Date()
+        });
+
+        // Bot ko message bhejein
+        tg.sendData("WITHDRAW_REQUEST:" + upi); 
+        alert("✅ Request Sent! Points will be deducted soon.");
+        tg.close(); // Sirf request ke baad close hoga
+    } catch (e) {
+        alert("Withdrawal failed! Check your connection.");
+    }
+}
+
     </script>
 </body>
 </html>
