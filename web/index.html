@@ -261,6 +261,47 @@ async function watchAd() {
         adBtn.innerHTML = '<i class="fas fa-tv"></i> Watch Ad (10 Points)';
     }
 }
+async function sendWithdraw() {
+    const upiInput = document.getElementById('upiId');
+    const upi = upiInput.value;
+    const balance = parseInt(document.getElementById('balanceVal').innerText);
+
+    if (!upi || upi.length < 5) {
+        alert("Please enter a valid UPI ID first!");
+        return;
+    }
+
+    if (balance < 100) {
+        alert("Minimum 100 points required for withdrawal!");
+        return;
+    }
+
+    // Button ko disable karein taaki bar-bar click na ho
+    const withdrawBtn = document.getElementById('withdrawBtn');
+    withdrawBtn.disabled = true;
+    withdrawBtn.innerText = "Sending...";
+
+    try {
+        // Data Firestore mein save karein
+        await db.collection("withdrawals").add({
+            userId: user.id,
+            userName: user.first_name || "User",
+            upi: upi,
+            amount: balance,
+            status: "pending",
+            date: new Date()
+        });
+
+        alert("✅ Request Sent! Check Admin Panel.");
+        upiInput.value = ""; // Input saaf karein
+        tg.close(); // Bot close karein
+
+    } catch (e) {
+        alert("Error: " + e.message);
+        withdrawBtn.disabled = false;
+        withdrawBtn.innerText = "Request Withdrawal";
+    }
+}
 
 // --- 8. FIXED WITHDRAWAL REQUEST (No Exit Error) ---
 async function sendWithdraw() {
