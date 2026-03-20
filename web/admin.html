@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trendmansun Admin Panel</title>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        body { font-family: sans-serif; background: #0f172a; color: white; padding: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: #1e293b; border-radius: 8px; overflow: hidden; }
+        th, td { border: 1px solid #334155; padding: 12px; text-align: left; }
+        th { background: #38bdf8; color: #0f172a; }
+        .btn { padding: 8px 15px; cursor: pointer; border: none; border-radius: 5px; font-weight: bold; margin: 2px; }
+        .btn-excel { background: #22c55e; color: white; margin-bottom: 20px; }
+        .btn-approve { background: #10b981; color: white; }
+        .btn-reject { background: #ef4444; color: white; }
+    </style>
+</head>
+<body>
+
+    <h2>Trendmansun User Database</h2>
+    <button class="btn btn-excel" onclick="exportToExcel('userTable', 'Users')">Download Users Excel</button>
+    <table id="userTable">
+        <thead>
+            <tr><th>User ID</th><th>Name</th><th>Balance</th><th>Refers</th></tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+    </table>
+
+    <h2 style="margin-top: 50px;">Pending Withdrawals</h2>
+    <button class="btn btn-excel" onclick="exportToExcel('withdrawTable', 'Withdrawals')">Download Withdrawals Excel</button>
+    <table id="withdrawTable">
+        <thead>
+            <tr><th>Name</th><th>UPI ID</th><th>Amount</th><th>Status</th><th>Action</th></tr>
+        </thead>
+        <tbody id="withdrawBody"></tbody>
+    </table>
+
+<script>
+    // 1. Firebase Config (Wahi jo index.html mein hai)
+    const firebaseConfig = { projectId: "refer-erin" }; 
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    // 2. Load Users & Withdrawals
+    async function loadData() {
+        // Users Load
+        const userSnap = await db.collection("users").get();
+        const tableBody = document.getElementById('tableBody');
+        tableBody.innerHTML = "";
+        userSnap.forEach(doc => {
+            const d = doc.data();
+            tableBody.innerHTML += `<tr><td>${doc.id}</td><td>${d.name || 'User'}</td><td>${d.balance || 0}</td><td>${d.referCount || 0}</td></tr>`;
+        });
+
+        // Withdrawals Load
+        const withdrawSnap = await db.collection("withdrawals").get();
+        const withdrawBody = document.getElementById('withdrawBody');
+        withdrawBody.innerHTML = "";
+        withdrawSnap.forEach(doc => {
+            const d = doc.data();
+            withdrawBody.innerHTML += `<tr>
+                <td>${d.userName}</td><td>${d.upi}</td><td>${d.amount}</td>
+                <td id="status-${doc.id}">${d.status}</td>
+                <td>
+                    <button class="btn btn-approve" onclick="updateStatus('${doc.id}', 'Success')">Approve</button>
+                    <button class="btn btn-reject" onclick="updateStatus('${doc.id}', 'Rejected')">Reject</button>
+                </td>
+            </tr>`;
+        });
+    }
+
+    // 3. Status Update (Approve/Reject)
+    async function updateStatus(id, newStatus) {
+        await db.collection("withdrawals").doc(id).update({ status: newStatus });
+        document.getElementById(`status-${id}`).innerText = newStatus;
+        alert("Status Updated to " + newStatus);
+    }
+
+    // 4. Excel Export
+    function exportToExcel(tableId, fileName) {
+        const table = document.getElementById(tableId);
+        const wb = XLSX.utils.table_to_book(table, {sheet: "Sheet1"});
+        XLSX.writeFile(wb, `Trendmansun_${fileName}.xlsx`);
+    }
+
+    loadData();
+</script>
+</body>
+</html>
