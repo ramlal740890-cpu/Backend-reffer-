@@ -63,21 +63,26 @@
             tableBody.innerHTML += `<tr><td>${doc.id}</td><td>${d.name || 'User'}</td><td>${d.balance || 0}</td><td>${d.referCount || 0}</td></tr>`;
         });
 
-        // Withdrawals Load
-        const withdrawSnap = await db.collection("withdrawals").get();
-        const withdrawBody = document.getElementById('withdrawBody');
-        withdrawBody.innerHTML = "";
-        withdrawSnap.forEach(doc => {
-            const d = doc.data();
-            withdrawBody.innerHTML += `<tr>
-                <td>${d.userName}</td><td>${d.upi}</td><td>${d.amount}</td>
-                <td id="status-${doc.id}">${d.status}</td>
-                <td>
-                    <button class="btn btn-approve" onclick="updateStatus('${doc.id}', 'Success')">Approve</button>
-                    <button class="btn btn-reject" onclick="updateStatus('${doc.id}', 'Rejected')">Reject</button>
-                </td>
-            </tr>`;
-        });
+        // Withdrawals Load karne ke liye sahi code
+const withdrawSnap = await db.collection("withdrawals").orderBy("date", "desc").get();
+const withdrawBody = document.getElementById('withdrawBody');
+withdrawBody.innerHTML = ""; 
+
+withdrawSnap.forEach(doc => {
+    const d = doc.data();
+    withdrawBody.innerHTML += `
+        <tr>
+            <td>${d.userName || 'Unknown'}</td>
+            <td>${d.upi || 'N/A'}</td>
+            <td>${d.amount || 0} Points</td>
+            <td id="status-${doc.id}">${d.status || 'pending'}</td>
+            <td>
+                <button class="btn btn-approve" onclick="updateStatus('${doc.id}', 'Success')">Approve</button>
+                <button class="btn btn-reject" onclick="updateStatus('${doc.id}', 'Rejected')">Reject</button>
+            </td>
+        </tr>`;
+});
+
     }
 
     // 3. Status Update (Approve/Reject)
