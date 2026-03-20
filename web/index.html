@@ -171,6 +171,23 @@
     }, 1000);
 }
 
+    async function grantAdPoints() {
+    const btn = document.getElementById('watchAdBtn');
+    try {
+        // User balance update karne ka main logic
+        await db.collection("users").doc(user.id.toString()).update({
+            balance: firebase.firestore.FieldValue.increment(10)
+        });
+        alert("✅ Success! 10 Points Added.");
+    } catch (e) {
+        console.error(e);
+        alert("Database Error: Points save nahi ho paye!");
+    }
+    btn.disabled = false;
+    btn.classList.remove('btn-disabled');
+    btn.innerText = "Watch Ad (10 Points)";
+}
+
     async function sendWithdraw() {
         const upi = document.getElementById('upiId').value;
         const bal = parseInt(document.getElementById('balanceVal').innerText);
