@@ -129,8 +129,7 @@
         let successCount = 0;
 
         for (const doc of usersSnap.docs) {
-            try {
-                await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage?chat_id=${doc.id}&text=${encodeURIComponent(msg)}`);
+            try {chat_id=${doc.id}&text=${encodeURIComponent(msg)}.
                 successCount++;
             } catch (e) { console.error("Error for " + doc.id); }
         }
