@@ -19,6 +19,14 @@
     </style>
 </head>
 <body>
+    <div id="loginOverlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:#0f172a; z-index:1000; display:flex; justify-content:center; align-items:center;">
+    <div style="background:#1e293b; padding:30px; border-radius:10px; text-align:center; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
+        <h3 style="color:#38bdf8; margin-bottom:20px;">Trendmansun Admin Login</h3>
+        <input type="password" id="adminPass" placeholder="Enter Admin Password" style="padding:10px; border-radius:5px; border:1px solid #334155; margin-bottom:15px; width:200px; display:block; color: black;">
+        <button class="btn btn-approve" onclick="checkPass()" style="width:100%;">Login</button>
+        <p id="errorMsg" style="color:#ef4444; font-size:12px; margin-top:10px; display:none;">Wrong Password!</p>
+    </div>
+</div>
 
     <h2>Trendmansun User Database</h2>
     <button class="btn btn-excel" onclick="exportToExcel('userTable', 'Users')">Download Users Excel</button>
@@ -86,7 +94,19 @@
         XLSX.writeFile(wb, `Trendmansun_${fileName}.xlsx`);
     }
 
-    loadData();
+    // Ye function check karega ki password sahi hai ya nahi
+function checkPass() {
+    const pass = document.getElementById('adminPass').value;
+    // Aapka password: Trendmansun@2026
+    if (pass === "Trendmansun@2026") {
+        document.getElementById('loginOverlay').parentElement.style.display = "none";
+        loadData(); // Password sahi hone par hi data load hoga
+    } else {
+        document.getElementById('errorMsg').style.display = "block";
+    }
+}
+// Ab loadData() ko yahan se hata diya hai taaki bina login data na dikhe.
+
 </script>
 </body>
 </html>
