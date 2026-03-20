@@ -107,7 +107,7 @@
             </div>
         </div>
 
-        <div class="action-card">
+<div class="action-card">
     <button id="watchAdBtn" class="btn btn-ad" onclick="watchAd()">
         <i class="fas fa-tv"></i> Watch Ad (10 Points)
     </button>
@@ -123,7 +123,7 @@
 </div>
 
 <script>
-    // --- 1. CONFIGURATION ---
+    // --- 1. CONFIGURATION (Ek hi baar setup karein) ---
     const firebaseConfig = { projectId: "refer-erin" }; 
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
@@ -131,24 +131,12 @@
     
     const tg = window.Telegram.WebApp;
     tg.expand();
+    tg.enableClosingConfirmation();
     const user = tg.initDataUnsafe.user;
     
+    // Aapka Adsterra Smartlink [cite: 2026-02-10]
     const AD_LINK = "https://horizontallyresearchpolar.com/agtpyhx7x?key=110b06db373e8440c1e41ae528a7a39c";
 
-
-    <script>
-        // --- 1. CONFIGURATION ---
-        const firebaseConfig = { projectId: "refer-erin" }; //
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
-        const storage = firebase.storage(); // Photo upload ke liye
-
-        const tg = window.Telegram.WebApp;
-        tg.expand();
-        tg.enableClosingConfirmation();
-        const user = tg.initDataUnsafe.user;
-        // Line 133 ko aise update karein:
-const AD_LINK = "https://horizontallyresearchpolar.com/agtpyhx7x?key=110b06db373e8440c1e41ae528a7a39c";
 
         // --- 2. USER PROFILE LOAD ---
         if (user) {
