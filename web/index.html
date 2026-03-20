@@ -10,330 +10,181 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-storage-compat.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        :root { --primary-bg: #0a0e17; --card-bg: #111827; --text-color: #f3f4f6; --neon-blue: #00d2ff; --neon-green: #05ffa1; --grey: #6b7280; --orange: #ff6b6b; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--primary-bg); color: var(--text-color); margin: 0; padding: 20px; text-align: center; }
-        .container { max-width: 600px; margin: auto; padding-bottom: 20px; }
+        :root { --primary-bg: #0a0e17; --card-bg: #111827; --text-color: #f3f4f6; --neon-blue: #00d2ff; --neon-green: #39ff14; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--primary-bg); color: var(--text-color); margin: 0; padding-bottom: 20px; }
+        .container { max-width: 600px; margin: auto; padding: 15px; }
+        
+        /* Overlay Style */
+        #subscriptionOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--primary-bg); z-index: 9999; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; box-sizing: border-box; }
+
+        /* Card Styles */
+        .action-card { background: var(--card-bg); padding: 20px; border-radius: 15px; border: 1px solid #1f2937; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        .btn { border: none; padding: 12px; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.3s; display: block; width: 100%; margin-top: 10px; color: white; text-decoration: none; text-align: center; }
+        .btn-blue { background: linear-gradient(45deg, var(--neon-blue), #3a7bd5); }
+        .btn-green { background: linear-gradient(45deg, var(--neon-green), #2ecc71); color: #000; }
+        .btn-ad { background: linear-gradient(45deg, #f39c12, #e67e22); }
+        
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+        .stat-card { background: var(--card-bg); padding: 15px; border-radius: 12px; text-align: center; border: 1px solid #1f2937; }
+        .stat-value { font-size: 24px; font-weight: bold; color: var(--neon-blue); }
+        
+        input { width: 100%; padding: 12px; background: #1f2937; border: 1px solid #374151; border-radius: 8px; color: white; margin-bottom: 10px; box-sizing: border-box; }
         
         /* Profile Header */
-        .profile-header { display: flex; align-items: center; justify-content: space-between; background: var(--card-bg); padding: 15px; border-radius: 20px; border: 1px solid #1f2937; margin-bottom: 20px; position: relative; }
-        #photoWrapper { position: relative; width: 60px; height: 60px; }
-        #userPhoto { width: 100%; height: 100%; border-radius: 50%; border: 3px solid var(--neon-blue); object-fit: cover; }
-        #editPhotoBtn { position: absolute; bottom: 0; right: 0; background: var(--neon-blue); color: #fff; width: 22px; height: 22px; border-radius: 50%; border: none; font-size: 12px; cursor: pointer; display: none; }
-        .profile-info { text-align: left; flex-grow: 1; margin-left: 15px; }
-        #userName { font-size: 18px; font-weight: bold; }
-        #joinedAt { font-size: 12px; color: var(--grey); margin-top: 3px; }
-        
-        /* Auto Banner Ad */
-        .banner-ad { width: 100%; height: 60px; background: #000; border-radius: 10px; border: 1px solid var(--orange); overflow: hidden; margin-bottom: 20px; box-shadow: 0 0 10px rgba(255,107,107,0.3); }
-        .banner-ad iframe { width: 100%; height: 100%; border: none; }
-
-        /* Stats Grid */
-        .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 20px; }
-        .stat-card { background: var(--card-bg); padding: 20px; border-radius: 15px; border: 1px solid #1f2937; transition: 0.3s; }
-        .stat-card:hover { border-color: var(--neon-blue); box-shadow: 0 0 15px rgba(0,210,255,0.3); }
-        .stat-icon { font-size: 30px; color: var(--neon-blue); margin-bottom: 10px; }
-        .stat-value { font-size: 28px; font-weight: bold; color: var(--neon-blue); }
-        .stat-label { font-size: 12px; color: var(--grey); text-transform: uppercase; margin-top: 5px; }
-        
-        /* Action Buttons */
-        .action-card { background: var(--card-bg); padding: 25px; border-radius: 20px; border: 1px solid #1f2937; margin-bottom: 20px; }
-        .btn { border: none; padding: 15px; border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.3s; color: white; margin-top: 10px; text-decoration: none; display: flex; align-items: center; justify-content: center; width: 100%; }
-        .btn-blue { background: linear-gradient(45deg, var(--neon-blue), #3a7bd5); }
-        .btn-green { background: linear-gradient(45deg, var(--neon-green), #2ecc71); }
-        .btn-ad { background: linear-gradient(45deg, var(--orange), #c0392b); }
-        .btn:active { transform: scale(0.98); }
-        .btn i { margin-right: 10px; }
-        
-        /* Refer & Input */
-        input { width: 100%; padding: 12px; background: #1f2937; border-radius: 10px; border: 1px solid #374151; color: white; box-sizing: border-box; font-size: 14px; margin-top: 15px; text-align: center; }
-        .share-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; }
-        .btn-whatsapp { background: #25D366; }
-        .btn-telegram { background: #0088cc; }
-        
-        /* Live Time & Date */
-        .live-info { font-size: 14px; color: var(--grey); margin-bottom: 30px; }
+        .profile-header { display: flex; align-items: center; gap: 15px; background: var(--card-bg); padding: 15px; border-radius: 15px; margin-bottom: 20px; }
+        #userPhoto { width: 60px; height: 60px; border-radius: 50%; border: 2px solid var(--neon-blue); }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="live-info" id="liveTime">Loading Time...</div>
 
-        <div class="profile-header">
-            <div id="photoWrapper">
-                <img id="userPhoto" src="https://via.placeholder.com/60" alt="Profile">
-                <button id="editPhotoBtn" onclick="selectPhoto()"><i class="fas fa-camera"></i></button>
-                <input type="file" id="photoInput" accept="image/*" style="display:none;" onchange="uploadPhoto(this.files)">
-            </div>
-            <div class="profile-info">
-                <div id="userName">User Profile</div>
-                <div id="joinedAt">Joined: Loading...</div>
-            </div>
-            <i class="fas fa-crown" style="color: var(--neon-blue); font-size: 20px;"></i>
-        </div>
-
-        <div class="banner-ad">
-            <iframe id="bannerAdFrame" src=""></iframe>
-        </div>
-
-        <div class="stats-grid">
-            <div class="stat-card">
-                <i class="fas fa-wallet stat-icon"></i>
-                <div class="stat-value" id="balanceVal">0</div>
-                <div class="stat-label">Your Points</div>
-            </div>
-            <div class="stat-card">
-                <i class="fas fa-users stat-icon"></i>
-                <div class="stat-value" id="refersVal">0</div>
-                <div class="stat-label">Total Refers (50 pts)</div>
-            </div>
-        </div>
-
-        <div class="action-card">
-            <h3><i class="fas fa-calendar-check" style="color: var(--neon-green);"></i> Daily Bonus (10 Points)</h3>
-            <p style="font-size: 12px; color: var(--grey);">Claim once per day! points instantly added.</p>
-            <button class="btn btn-green" id="dailyBtn" onclick="claimDaily()">
-                <i class="fas fa-gift"></i> Claim Daily 10 Points
-            </button>
-            <div id="timer" style="font-size: 14px; margin-top: 10px; color: var(--neon-green); display:none;">Available in 23:59:59</div>
-        </div>
-
-        <div class="action-card">
-            <h3><i class="fas fa-share-alt" style="color: var(--neon-blue);"></i> Refer Friends (50 Points)</h3>
-            <p style="font-size: 12px; color: var(--grey);">Share link below. Earn points per user.</p>
-            <input type="text" id="inviteInput" readonly value="https://t.me/Refer_Erin_bot?start=123">
-            <div class="share-buttons">
-                <a href="#" target="_blank" id="waShare" class="btn btn-whatsapp"><i class="fab fa-whatsapp"></i> WhatsApp</a>
-                <a href="#" target="_blank" id="tgShare" class="btn btn-telegram"><i class="fab fa-telegram-plane"></i> Telegram</a>
-            </div>
-        </div>
-
-<div class="action-card">
-    <button id="watchAdBtn" class="btn btn-ad" onclick="watchAd()">
-        <i class="fas fa-tv"></i> Watch Ad (10 Points)
-    </button>
+<div id="subscriptionOverlay">
+    <h2 style="color: var(--neon-blue);">🚀 Trendmansun Community</h2>
+    <p>Please follow us to unlock earning features!</p>
+    
+    <a href="https://www.youtube.com/@Trendmansun" target="_blank" class="btn" style="background: #ff0000;"><i class="fab fa-youtube"></i> Subscribe YouTube</a>
+    <a href="https://www.instagram.com/trendmansun" target="_blank" class="btn" style="background: linear-gradient(45deg, #f09433, #bc1888);"><i class="fab fa-instagram"></i> Follow Instagram</a>
+    <a href="https://www.facebook.com/profile.php?id=61572737445421" target="_blank" class="btn" style="background: #1877f2;"><i class="fab fa-facebook"></i> Follow Facebook</a>
+    
+    <button onclick="verifySub()" class="btn btn-blue" style="margin-top: 25px;">✅ I Have Joined - Open Bot</button>
 </div>
 
-<div class="action-card">
-    <input type="text" id="upiId" placeholder="Enter UPI ID (e.g. name@apl)" 
-           style="width: 90%; padding: 12px; margin-bottom: 10px; border-radius: 8px; border: 1px solid #374151; background: #1f2937; color: white; display: block; margin-left: auto; margin-right: auto;">
-    
-    <button class="btn btn-blue" onclick="sendWithdraw()" id="withdrawBtn" style="width: 90%; display: block; margin-left: auto; margin-right: auto;">
-        <i class="fas fa-paper-plane"></i> Request Withdrawal
-    </button>
+<div class="container">
+    <div class="profile-header">
+        <img id="userPhoto" src="https://via.placeholder.com/60" alt="Profile">
+        <div>
+            <div id="userName" style="font-weight: bold; font-size: 18px;">User Profile</div>
+            <div id="joinedAt" style="font-size: 12px; color: #9ca3af;">Loading...</div>
+        </div>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-value" id="balanceVal">0</div>
+            <div style="font-size: 12px; color: #9ca3af;">Your Points</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="refersVal">0</div>
+            <div style="font-size: 12px; color: #9ca3af;">Total Refers</div>
+        </div>
+    </div>
+
+    <div class="action-card">
+        <h3>🎁 Daily Rewards</h3>
+        <button id="dailyBtn" class="btn btn-green" onclick="claimDaily()"><i class="fas fa-gift"></i> Claim Daily Bonus (10 Pts)</button>
+    </div>
+
+    <div class="action-card">
+        <h3>📺 Watch & Earn</h3>
+        <button id="watchAdBtn" class="btn btn-ad" onclick="watchAd()"><i class="fas fa-tv"></i> Watch Video Ad (10 Pts)</button>
+    </div>
+
+    <div class="action-card">
+        <h3>👥 Refer Friends (50 Points)</h3>
+        <input type="text" id="inviteInput" readonly value="Loading Link...">
+        <div style="display: flex; gap: 10px;">
+            <a id="waShare" class="btn" style="background: #25d366;"><i class="fab fa-whatsapp"></i> WhatsApp</a>
+            <a id="tgShare" class="btn" style="background: #0088cc;"><i class="fab fa-telegram"></i> Telegram</a>
+        </div>
+    </div>
+
+    <div class="action-card">
+        <h3>💰 Withdraw Points</h3>
+        <input type="text" id="upiId" placeholder="Enter UPI ID (e.g. name@apl)">
+        <button id="withdrawBtn" class="btn btn-blue" onclick="sendWithdraw()"><i class="fas fa-paper-plane"></i> Request Withdrawal</button>
+    </div>
 </div>
 
 <script>
-    // --- 1. CONFIGURATION (Ek hi baar setup karein) ---
+    // --- CONFIGURATION ---
     const firebaseConfig = { projectId: "refer-erin" }; 
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
-    const storage = firebase.storage();
-    
     const tg = window.Telegram.WebApp;
     tg.expand();
-    tg.enableClosingConfirmation();
     const user = tg.initDataUnsafe.user;
-    
-    // Aapka Adsterra Smartlink [cite: 2026-02-10]
+
     const AD_LINK = "https://horizontallyresearchpolar.com/agtpyhx7x?key=110b06db373e8440c1e41ae528a7a39c";
 
+    // --- FORCE JOIN LOGIC ---
+    function verifySub() {
+        localStorage.setItem('trendmansun_joined', 'true');
+        document.getElementById('subscriptionOverlay').style.display = 'none';
+    }
 
-        // --- 2. USER PROFILE LOAD ---
-        if (user) {
-            document.getElementById('userName').innerText = (user.first_name || 'User') + " " + (user.last_name || '');
-            document.getElementById('editPhotoBtn').style.display = 'block'; // Photo edit button dikhana
-            
-            const userRef = db.collection("users").doc(user.id.toString());
-            const inviteUrl = `https://t.me/Refer_Erin_bot?start=${user.id}`;
-            document.getElementById('inviteInput').value = inviteUrl;
-            
-            // Share text setup
-            const text = `Join now and earn rewards! Link: ${inviteUrl}`;
-            document.getElementById('waShare').href = `whatsapp://send?text=${encodeURIComponent(text)}`;
-            document.getElementById('tgShare').href = `tg://msg?text=${encodeURIComponent(text)}`;
-
-            // Load Firebase Data (Points, Photo, joinedAt)
-            userRef.onSnapshot((doc) => {
-                if (doc.exists) {
-                    const data = doc.data();
-                    document.getElementById('balanceVal').innerText = data.balance || 0;
-                    document.getElementById('refersVal').innerText = data.referCount || 0;
-                    
-                    // Profile Photo (Firebase mein uploaded ya Telegram ki default)
-                    if(data.photoUrl) { document.getElementById('userPhoto').src = data.photoUrl; } 
-                    else if(user.photo_url) { document.getElementById('userPhoto').src = user.photo_url; }
-
-                    if(data.joinedAt) {
-                      const joinedDate = new Date(data.joinedAt.seconds * 1000).toLocaleDateString('en-IN');
-                      document.getElementById('joinedAt').innerText = `Joined: ${joinedDate}`;
-                    }
-                }
-            });
+    window.onload = function() {
+        if (!localStorage.getItem('trendmansun_joined')) {
+            document.getElementById('subscriptionOverlay').style.display = 'flex';
         }
+        loadUserData();
+    };
 
-        // --- 3. PHOTO UPLOAD LOGIC ---
-        function selectPhoto() { document.getElementById('photoInput').click(); }
+    // --- DATA LOADING ---
+    async function loadUserData() {
+        if (!user) return;
+        document.getElementById('userName').innerText = user.first_name;
+        document.getElementById('userPhoto').src = user.photo_url || "https://via.placeholder.com/60";
 
-        async function uploadPhoto(files) {
-          if(!user || files.length === 0) return;
-          const file = files[0];
-          const userPhotoRef = storage.ref().child(`user_photos/${user.id}_profile.jpg`);
-          const userRef = db.collection("users").doc(user.id.toString());
+        const inviteUrl = `https://t.me/Refer_Erin_bot?start=${user.id}`;
+        document.getElementById('inviteInput').value = inviteUrl;
+        document.getElementById('waShare').href = `whatsapp://send?text=Earn Money! Join now: ${inviteUrl}`;
+        document.getElementById('tgShare').href = `https://t.me/share/url?url=${inviteUrl}&text=Earn Free Rewards!`;
 
-          tg.MainButton.setText("Uploading Photo...").show().disable();
-          
-          try {
-            await userPhotoRef.put(file); // Upload karna
-            const downloadUrl = await userPhotoRef.getDownloadURL(); // URL lena
-            await userRef.update({ photoUrl: downloadUrl }); // Firestore update
-            tg.MainButton.setText("Photo Updated! ✅").show();
-            setTimeout(() => tg.MainButton.hide(), 2000);
-          } catch (e) {
-            console.error(e);
-            alert("Photo upload failed.");
-            tg.MainButton.hide();
-          }
-        }
-
-        // --- 4. DAILY BONUS LOGIC (10 Points) ---
-        function claimDaily() {
-          if(!user) return;
-          const userRef = db.collection("users").doc(user.id.toString());
-          const now = Date.now();
-          const oneDay = 24 * 60 * 60 * 1000;
-
-          userRef.get().then(doc => {
-            const lastClaim = (doc.exists && doc.data().lastDailyBonus) ? doc.data().lastDailyBonus : 0;
-            
-            if(now - lastClaim < oneDay) {
-              alert("Wait 24 hours to claim again.");
-            } else {
-              userRef.update({
-                balance: firebase.firestore.FieldValue.increment(10),
-                lastDailyBonus: now
-              }).then(() => {
-                alert("🎁 10 Points Daily Bonus Added!");
-              });
-            }
-          });
-        }
-
-        // --- 5. TIME & DATE & AUTO BANNER AD (every 5 seconds) ---
-        function updateLiveInfo() {
-          const now = new Date();
-          const options = { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' };
-          document.getElementById('liveTime').innerText = now.toLocaleString('en-IN', options);
-          
-          // Auto Refresh Banner Ad
-          document.getElementById('bannerAdFrame').src = AD_LINK;
-        }
-        updateLiveInfo(); // Instant load
-        setInterval(updateLiveInfo, 5000); // 5-second cycle
-
-        // --- 6. WITHDRAWAL REQUEST ---
-        function sendWithdraw() {
-          const upi = document.getElementById('upiId').value;
-          if(!upi || upi.length < 5) return alert("Enter correct UPI ID.");
-          tg.sendData("UPI " + upi); // Bot ko bhejna
-          tg.close();
-        }
-        // --- 7. WATCH AD & EARN POINTS ---
-async function watchAd() {
-    if (!user) return alert("User not found!");
-    
-    const adBtn = document.getElementById('watchAdBtn');
-    
-    // 1. Ad open karein
-    window.open(AD_LINK, '_blank');
-    
-    // 2. Points update karein (Firestore mein)
-    adBtn.disabled = true;
-    adBtn.innerText = "Adding Points...";
-
-    try {
         const userRef = db.collection("users").doc(user.id.toString());
-        await userRef.update({
-            balance: firebase.firestore.FieldValue.increment(10)
+        userRef.onSnapshot((doc) => {
+            if (doc.exists) {
+                const data = doc.data();
+                document.getElementById('balanceVal').innerText = data.balance || 0;
+                document.getElementById('refersVal').innerText = data.referCount || 0;
+            } else {
+                userRef.set({ name: user.first_name, balance: 0, referCount: 0, joinedAt: new Date() });
+            }
         });
-        alert("🎁 10 Points added for watching ad!");
-    } catch (e) {
-        console.error("Ad Error:", e);
-        alert("Points update failed!");
-    } finally {
-        adBtn.disabled = false;
-        adBtn.innerHTML = '<i class="fas fa-tv"></i> Watch Ad (10 Points)';
-    }
-}
-async function sendWithdraw() {
-    const upiInput = document.getElementById('upiId');
-    const upi = upiInput.value;
-    const balance = parseInt(document.getElementById('balanceVal').innerText);
-
-    if (!upi || upi.length < 5) {
-        alert("Please enter a valid UPI ID first!");
-        return;
     }
 
-    if (balance < 100) {
-        alert("Minimum 100 points required for withdrawal!");
-        return;
+    // --- EARNING FUNCTIONS ---
+    function watchAd() {
+        window.open(AD_LINK, '_blank');
+        const userRef = db.collection("users").doc(user.id.toString());
+        userRef.update({ balance: firebase.firestore.FieldValue.increment(10) });
+        alert("Success! 10 Points Added.");
     }
 
-    // Button ko disable karein taaki bar-bar click na ho
-    const withdrawBtn = document.getElementById('withdrawBtn');
-    withdrawBtn.disabled = true;
-    withdrawBtn.innerText = "Sending...";
-
-    try {
-        // Data Firestore mein save karein
-        await db.collection("withdrawals").add({
-            userId: user.id,
-            userName: user.first_name || "User",
-            upi: upi,
-            amount: balance,
-            status: "pending",
-            date: new Date()
-        });
-
-        alert("✅ Request Sent! Check Admin Panel.");
-        upiInput.value = ""; // Input saaf karein
-        tg.close(); // Bot close karein
-
-    } catch (e) {
-        alert("Error: " + e.message);
-        withdrawBtn.disabled = false;
-        withdrawBtn.innerText = "Request Withdrawal";
+    async function claimDaily() {
+        const userRef = db.collection("users").doc(user.id.toString());
+        userRef.update({ balance: firebase.firestore.FieldValue.increment(10) });
+        alert("Daily Bonus Claimed!");
     }
-}
 
-// --- 8. FIXED WITHDRAWAL REQUEST (No Exit Error) ---
-async function sendWithdraw() {
-    const upi = document.getElementById('upiId').value;
-    const balance = parseInt(document.getElementById('balanceVal').innerText);
+    // --- WITHDRAWAL LOGIC ---
+    async function sendWithdraw() {
+        const upi = document.getElementById('upiId').value;
+        const balance = parseInt(document.getElementById('balanceVal').innerText);
 
-    if (!upi || upi.length < 5) return alert("Enter correct UPI ID.");
-    if (balance < 100) return alert("Minimum 100 points required for withdrawal!");
+        if (!upi || upi.length < 5) return alert("Pahle UPI ID sahi se daalein!");
+        if (balance < 100) return alert("Withdrawal ke liye minimum 100 points chahiye!");
 
-    try {
-        // Data Firebase 'withdrawals' collection mein save karein
-        await db.collection("withdrawals").add({
-            userId: user.id,
-            userName: user.first_name,
-            upi: upi,
-            amount: balance,
-            status: "pending",
-            date: new Date()
-        });
+        const btn = document.getElementById('withdrawBtn');
+        btn.disabled = true;
+        btn.innerText = "Processing...";
 
-        // Bot ko message bhejein
-        tg.sendData("WITHDRAW_REQUEST:" + upi); 
-        alert("✅ Request Sent! Points will be deducted soon.");
-        tg.close(); // Sirf request ke baad close hoga
-    } catch (e) {
-        alert("Withdrawal failed! Check your connection.");
+        try {
+            await db.collection("withdrawals").add({
+                userId: user.id,
+                userName: user.first_name,
+                upi: upi,
+                amount: balance,
+                status: "pending",
+                date: new Date()
+            });
+            await db.collection("users").doc(user.id.toString()).update({ balance: 0 });
+            alert("✅ Withdrawal Request Sent Successfully!");
+            btn.innerText = "Request Withdrawal";
+            btn.disabled = false;
+        } catch (e) {
+            alert("Error sending request!");
+            btn.disabled = false;
+        }
     }
-}
-
-    </script>
+</script>
 </body>
 </html>
