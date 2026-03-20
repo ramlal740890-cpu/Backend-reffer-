@@ -155,36 +155,22 @@
 
     // --- 5. WATCH AD (Timer Logic) ---
     function watchAd() {
-        window.open(AD_LINK, '_blank');
-        const btn = document.getElementById('watchAdBtn');
-        btn.disabled = true;
-        btn.classList.add('btn-disabled');
-        
-        let timeLeft = 15;
-        const timer = setInterval(() => {
-            btn.innerText = `Wait ${timeLeft}s...`;
-            timeLeft--;
-            if (timeLeft < 0) {
-                clearInterval(timer);
-                grantAdPoints();
-            }
-        }, 1000);
-    }
+    const btn = document.getElementById('watchAdBtn');
+    window.open(AD_LINK, '_blank'); // Ad khul jayega
+    btn.disabled = true;
+    btn.classList.add('btn-disabled');
+    
+    let timeLeft = 15;
+    const timer = setInterval(() => {
+        btn.innerText = `Wait ${timeLeft}s to Verify...`;
+        timeLeft--;
+        if (timeLeft < 0) {
+            clearInterval(timer);
+            grantAdPoints(); // 15s baad points milenge
+        }
+    }, 1000);
+}
 
-    async function grantAdPoints() {
-        const btn = document.getElementById('watchAdBtn');
-        try {
-            await db.collection("users").doc(user.id.toString()).update({
-                balance: firebase.firestore.FieldValue.increment(10)
-            });
-            alert("✅ Ad Complete! 10 Points Added.");
-        } catch (e) { alert("Points add nahi ho paye."); }
-        btn.disabled = false;
-        btn.classList.remove('btn-disabled');
-        btn.innerText = "Watch Ad (10 Points)";
-    }
-
-    // --- 6. WITHDRAWAL ---
     async function sendWithdraw() {
         const upi = document.getElementById('upiId').value;
         const bal = parseInt(document.getElementById('balanceVal').innerText);
