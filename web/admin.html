@@ -113,6 +113,28 @@
                     </td>
                 </tr>`;
         });
+        // Status Update karne ke liye function
+async function updateStatus(docId, newStatus) {
+    try {
+        await db.collection("withdrawals").doc(docId).update({
+            status: newStatus
+        });
+        alert("Status updated to: " + newStatus);
+        loadData(); // Table refresh karein
+    } catch (e) {
+        alert("Error updating status!");
+    }
+}
+
+// Broadcast Message function (Line 42 ke button ke liye)
+async function sendBroadcast() {
+    const msg = document.getElementById('broadcastMsg').value;
+    if(!msg) return alert("Message likhein!");
+    
+    // Yahan aap apna bot notification logic daal sakte hain
+    alert("Message sent to all users (Feature Coming Soon!)");
+}
+
     }
 
     // 4. BROADCAST FUNCTION
