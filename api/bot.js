@@ -1,21 +1,18 @@
 const axios = require('axios');
 const admin = require('firebase-admin');
 
-// 1. Firebase Admin Initialization
+// 1. Firebase Setup
 if (!admin.apps.length) {
     admin.initializeApp({
         credential: admin.credential.cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT))
     });
 }
 const db = admin.firestore();
-
-// 2. Configuration
 const token = process.env.BOT_TOKEN; 
 const telegramUrl = `https://api.telegram.org/bot${token}/sendMessage`;
-const AD_LINK = "https://horizontallyresearchpolar.com/r0wbx3kyf?key=8b0a2298684c7cea730312add326101b";
 
 module.exports = async (req, res) => {
-    if (req.method !== 'POST') return res.status(200).send('Earning Bot is Live! 🚀');
+    if (req.method !== 'POST') return res.status(200).send('Bot Active!');
 
     try {
         const { message } = req.body;
@@ -26,100 +23,78 @@ module.exports = async (req, res) => {
         const name = message.from.first_name || "User";
         const userRef = db.collection('users').doc(chatId);
 
-        // --- BOT LOGIC ---
+        // --- COMMANDS ---
 
-        // START & REFERRAL (50 Points)
         if (text.startsWith('/start')) {
             const doc = await userRef.get();
             if (!doc.exists) {
                 const refCode = text.split(' ')[1];
-                await userRef.set({ points: 0, lastVideo: 0, lastDaily: 0, refers: 0 });
-                
+                await userRef.set({ points: 0, lastVideo: 0, lastDaily: 0, refers: 0, step: 'idle' });
+                // Referral Logic
                 if (refCode && refCode !== chatId) {
                     const rRef = db.collection('users').doc(refCode);
-                    await rRef.update({ 
-                        points: admin.firestore.FieldValue.increment(50), 
-                        refers: admin.firestore.FieldValue.increment(1) 
-                    });
+                    await rRef.update({ points: admin.firestore.FieldValue.increment(50), refers: admin.firestore.FieldValue.increment(1) });
                 }
             }
-            const welcomeMsg = `<b>Namaste ${name}! 🙏</b>\n\nIndia ke No.1 Earning Bot mein swagat hai.\n\n💰 <b>Rewards Guide:</b>\n📺 Video Ad: 20 Points\n👫 Per Refer: 50 Points\n📅 Daily Check-in: 10 Points`;
-            await sendMessage(chatId, welcomeMsg, mainKeyboard());
+            await sendMessage(chatId, `<b>Namaste ${name}! 🙏</b>\n\nWelcome to <b>Real Case Earning Bot</b>.`, mainKeyboard());
         }
 
-        // WATCH VIDEO (20 Points + 15s Timer Instruction)
-        else if (text === '📺 Watch Video') {
+        // --- WITHDRAW LOGIC ---
+        else if (text === '🏦 Withdraw') {
             const doc = await userRef.get();
-            const userData = doc.data();
-            const now = Date.now();
-            const cooldown = 30 * 60 * 1000; // 30 Minute gap for safety
-
-            if (now - (userData.lastVideo || 0) < cooldown) {
-                const wait = Math.ceil((cooldown - (now - userData.lastVideo)) / 60000);
-                await sendMessage(chatId, `⏳ Agli video <b>${wait} minute</b> baad dekhein.`);
+            const data = doc.data();
+            if (data.points < 1000) {
+                await sendMessage(chatId, `❌ Aapka balance <b>${data.points} Points</b> hai. Minimum payout 1000 Points (₹50) hai.`);
             } else {
-                await userRef.update({ points: admin.firestore.FieldValue.increment(20), lastVideo: now });
-                const adMsg = `<b>📺 Reward Task!</b>\n\nNiche button par click karein aur 15 Second tak video dekhein.\n\nReward automatic add kar diya gaya hai!`;
-                const inlineKb = { inline_keyboard: [[{ text: "🚀 Open Video Ad", url: AD_LINK }]] };
-                await sendMessage(chatId, adMsg, null, inlineKb);
+                await userRef.update({ step: 'awaiting_upi' });
+                await sendMessage(chatId, "<b>🏦 Withdrawal Request</b>\n\nApna <b>UPI ID</b> ya <b>PhonePe Number</b> niche type karke bhejein:");
             }
         }
 
-        // DAILY BONUS (10 Points)
-        else if (text === '📅 Daily Bonus') {
+        // User jab UPI details bhejta hai
+        else {
             const doc = await userRef.get();
-            const userData = doc.data();
-            const now = Date.now();
-            if (now - (userData.lastDaily || 0) < 86400000) {
-                await sendMessage(chatId, "❌ Aap aaj ka bonus pehle hi le chuke hain. Kal wapis aayein!");
-            } else {
-                await userRef.update({ points: admin.firestore.FieldValue.increment(10), lastDaily: now });
-                await sendMessage(chatId, "✅ <b>10 Points</b> Daily Bonus add kar diya gaya hai!");
+            const data = doc.data();
+
+            if (data.step === 'awaiting_upi') {
+                const upiDetails = text;
+                const pointsToDeduct = data.points;
+
+                // Points zero karke request save karna
+                await userRef.update({ points: 0, step: 'idle' });
+                
+                // Admin ko notification bhej sakte hain ya Firebase mein alag collection bana sakte hain
+                await db.collection('withdrawals').add({
+                    chatId: chatId,
+                    name: name,
+                    details: upiDetails,
+                    amount: pointsToDeduct,
+                    status: 'Pending',
+                    date: new Date().toISOString()
+                });
+
+                await sendMessage(chatId, `✅ <b>Request Sent!</b>\n\nAapki ₹${(pointsToDeduct/20).toFixed(2)} ki request check ki ja rahi hai. 24 ghante mein payment mil jayegi.`);
             }
         }
 
-        // PROFILE & STATISTICS
+        // --- PROFILE & VIDEO (Purana logic) ---
         else if (text === '👤 Profile') {
             const doc = await userRef.get();
             const d = doc.data() || { points: 0, refers: 0 };
-            const profileMsg = `<b>📊 My Dashboard</b>\n\n👤 Name: ${name}\n💰 Balance: <b>${d.points} Points</b>\n👥 Total Refers: ${d.refers}\n🆔 User ID: <code>${chatId}</code>`;
-            await sendMessage(chatId, profileMsg, mainKeyboard());
+            await sendMessage(chatId, `<b>📊 My Dashboard</b>\n\n💰 Balance: ${d.points} Pts\n👥 Refers: ${d.refers}`);
         }
 
-        // REFER & EARN
-        else if (text === '👫 Refer & Earn') {
-            const link = `https://t.me/Real_Case_earning_bot?start=${chatId}`;
-            await sendMessage(chatId, `<b>👫 Refer & Earn</b>\n\nEk dost ko join karwane par <b>50 Points</b> milenge!\n\nAapka Link: <code>${link}</code>`, mainKeyboard());
-        }
-
-        // WITHDRAW
-        else if (text === '🏦 Withdraw') {
-            await sendMessage(chatId, "<b>🏦 Withdraw Panel</b>\n\nMinimum Withdrawal: 1000 Points (₹50).\n\nApne points badhane ke liye refer aur video dekhte rahein!", mainKeyboard());
-        }
-
-    } catch (e) { console.error("Bot Error:", e); }
+    } catch (e) { console.error(e); }
     res.status(200).send('OK');
 };
 
-// Helper function to send messages
-async function sendMessage(chatId, text, kb, inlineKb) {
-    await axios.post(telegramUrl, {
-        chat_id: chatId,
-        text: text,
-        parse_mode: 'HTML',
-        reply_markup: inlineKb || kb,
-        disable_web_page_preview: true
-    });
+async function sendMessage(chatId, text, kb) {
+    await axios.post(telegramUrl, { chat_id: chatId, text: text, parse_mode: 'HTML', reply_markup: kb });
 }
 
-// Main Menu Buttons
 function mainKeyboard() {
     return {
-        keyboard: [
-            [{ text: '📅 Daily Bonus' }, { text: '📺 Watch Video' }],
-            [{ text: '👤 Profile' }, { text: '👫 Refer & Earn' }],
-            [{ text: '🏦 Withdraw' }]
-        ],
+        keyboard: [[{ text: '📺 Watch Video' }, { text: '📅 Daily Bonus' }], [{ text: '👤 Profile' }, { text: '👫 Refer & Earn' }], [{ text: '🏦 Withdraw' }]],
         resize_keyboard: true
     };
 }
