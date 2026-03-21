@@ -67,12 +67,12 @@
 
 <script>
     // 1. CONFIGURATION
-    const firebaseConfig = { projectId: "refer-erin" }; 
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
-    const BOT_TOKEN = "7928266949:AAHqGiztgRNNGJ7u1jznA2ZuS98hshx8hXU"; // [cite: 2026-02-06]
+const firebaseConfig = { 
+    projectId: "refer-erin" // Yahan wahi ID rakhein jo Firebase Console mein hai
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
 
-    // 2. PASSWORD CHECK
     function checkPass() {
         const pass = document.getElementById('adminPass').value;
         if (pass === "Trendmansun@2026") {
