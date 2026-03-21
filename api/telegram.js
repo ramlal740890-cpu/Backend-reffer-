@@ -1,114 +1,88 @@
-const { Telegraf } = require('telegraf');
-const admin = require('firebase-admin');
+const axios = require('axios');
 
-// --- 1. CONFIGURATION ---
-const BOT_TOKEN = "7928266949:AAHqGiztgRNNGJ7u1jznA2ZuS98hshx8hXU"; // [cite: 2026-02-06]
-const ADMIN_ID = "5802852969"; //
-const FIREBASE_PROJECT_ID = "refer-erin"; //
+// Bot Configuration
+const token = process.env.BOT_TOKEN; // Vercel Settings mein add karein: 8711347335:AAFdZV11arLIR898b1Sh2zW7Ajdqp_P8RHM
+const telegramUrl = `https://api.telegram.org/bot${token}/sendMessage`;
 
-// Firebase Initialization
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)),
-    projectId: FIREBASE_PROJECT_ID
-  });
-}
-
-const db = admin.firestore();
-const bot = new Telegraf(BOT_TOKEN);
-
-// --- 2. WELCOME LOGIC ---
-async function sendWelcome(ctx, userData, userId, userName) {
-  const inviteLink = `https://t.me/Refer_Erin_bot?start=${userId}`;
-  const miniAppUrl = `https://backend-reffer-blond.vercel.app/web/index.html`; //
-
-  const text = `Welcome ${userName}! ✨\n\n` +
-               `💰 **Balance:** ${userData.balance || 0} Points\n` +
-               `🔗 **Refer Link:**\n${inviteLink}\n\n` +
-               `Ek share par **50 points** kamayein! 🚀\n` +
-               `Nikaasi ke liye /withdraw likhein.`;
-
-  return ctx.replyWithMarkdown(text, {
-    reply_markup: {
-      inline_keyboard: [
-        [{ text: "🚀 Open Dashboard", web_app: { url: miniAppUrl } }],
-        [{ text: "📤 Share & Earn (50 Pts)", switch_inline_query: `Join now & earn! Link: ${inviteLink}` }]
-      ]
-    }
-  });
-}
-
-// --- 3. COMMANDS ---
-
-// Start Command (Referral Handling)
-bot.start(async (ctx) => {
-  const userId = ctx.from.id.toString();
-  const userName = ctx.from.first_name || "User";
-  const referrerId = ctx.startPayload; 
-  const now = admin.firestore.FieldValue.serverTimestamp();
-
-  try {
-    const userRef = db.collection('users').doc(userId);
-    const doc = await userRef.get();
-
-    if (!doc.exists) {
-      // New User Creation
-      await userRef.set({
-        uid: userId,
-        name: userName,
-        balance: 0,
-        referCount: 0,
-        referredBy: (referrerId && referrerId !== userId) ? referrerId : null,
-        joinedAt: now
-      });
-
-      // Referral Bonus (50 pts)
-      if (referrerId && referrerId !== userId) {
-        const referrerRef = db.collection('users').doc(referrerId);
-        await referrerRef.update({
-          balance: admin.firestore.FieldValue.increment(50),
-          referCount: admin.firestore.FieldValue.increment(1)
-        });
-        
-        try { await ctx.telegram.sendMessage(referrerId, `🎁 Badhai ho! ${userName} ne join kiya. Aapko 50 Points mile hain!`); } catch (e) {}
-      }
-    }
-    
-    const userData = (await userRef.get()).data();
-    await sendWelcome(ctx, userData, userId, userName);
-
-  } catch (error) {
-    console.error("Error:", error);
-    ctx.reply("System busy, please try again.");
-  }
-});
-
-// Withdrawal Request
-bot.hears(/UPI (.+)/i, async (ctx) => {
-  const upiId = ctx.match[1];
-  const userId = ctx.from.id.toString();
-  const userRef = db.collection('users').doc(userId);
-  const doc = await userRef.get();
-
-  if (doc.exists && doc.data().balance >= 500) {
-    const amount = doc.data().balance;
-    await db.collection('withdrawals').add({
-      userId, upi: upiId, amount, status: 'pending', timestamp: admin.firestore.FieldValue.serverTimestamp()
-    });
-    await userRef.update({ balance: 0 });
-    ctx.reply(`✅ Request Sent! Amount: ${amount}\nAdmin jald hi process karega.`);
-    await ctx.telegram.sendMessage(ADMIN_ID, `🚨 NEW PAYOUT!\nUser: ${userId}\nUPI: ${upiId}\nAmount: ${amount}`);
-  } else {
-    ctx.reply("❌ Minimum 500 points required for withdrawal.");
-  }
-});
-
-// --- 4. EXPORT FOR VERCEL ---
 module.exports = async (req, res) => {
-  try {
-    if (req.body) await bot.handleUpdate(req.body);
+    if (req.method !== 'POST') {
+        return res.status(200).send('Bot is Running!');
+    }
+
+    try {
+        const { message } = req.body;
+
+        if (message && message.text) {
+            const chatId = message.chat.id;
+            const text = message.text;
+            const firstName = message.from.first_name || "User";
+
+            // 1. Start Command & Referral Logic
+            if (text.startsWith('/start')) {
+                const referralCode = text.split(' ')[1]; // Check if joined via link
+                let welcomeMsg = `<b>Namaste ${firstName}! 🙏</b>\n\nWelcome to <b>Real Case Earning Bot</b>. Yahan aap tasks pure karke aur doston ko refer karke real money kama sakte hain.`;
+                
+                if (referralCode) {
+                    welcomeMsg += `\n\n✅ Aapne ID: <code>${referralCode}</code> ke referral se join kiya hai!`;
+                }
+
+                await sendMessage(chatId, welcomeMsg, mainKeyboard());
+            }
+
+            // 2. Profile & Balance
+            else if (text === '👤 Profile' || text === '/profile') {
+                const profileMsg = `<b>📊 User Statistics</b>\n\n👤 Name: ${firstName}\n🆔 ID: <code>${chatId}</code>\n💰 Balance: ₹0.00\n👥 Total Refers: 0\n\n<i>Note: Database connect hone par real balance dikhega.</i>`;
+                await sendMessage(chatId, profileMsg, mainKeyboard());
+            }
+
+            // 3. Refer & Earn Link
+            else if (text === '👫 Refer & Earn') {
+                const referLink = `https://t.me/Real_Case_earning_bot?start=${chatId}`;
+                const referMsg = `<b>👫 Refer & Earn Program</b>\n\nPer Refer: ₹5.00\n\nAapka unique link niche hai. Ise apne doston ke saath share karein:\n\n<code>${referLink}</code>`;
+                await sendMessage(chatId, referMsg, mainKeyboard());
+            }
+
+            // 4. Tasks Section
+            else if (text === '📝 Tasks') {
+                const taskMsg = `<b>📝 Available Tasks</b>\n\n1. Subscribe YouTube: ₹2.00\n2. Join Telegram: ₹1.00\n\n<i>Tasks pure karein aur screenshot admin ko bhejien.</i>`;
+                await sendMessage(chatId, taskMsg, mainKeyboard());
+            }
+
+            // 5. Withdraw Section
+            else if (text === '🏦 Withdraw') {
+                const withdrawMsg = `<b>🏦 Withdrawal Request</b>\n\nMinimum Payout: ₹50.00\n\nAapka balance abhi kam hai. Earning badhane ke liye refer karein!`;
+                await sendMessage(chatId, withdrawMsg, mainKeyboard());
+            }
+
+            // Default Response
+            else {
+                await sendMessage(chatId, "Kripya niche diye gaye buttons ka use karein 👇", mainKeyboard());
+            }
+        }
+    } catch (error) {
+        console.error("Bot Error:", error);
+    }
+
     res.status(200).send('OK');
-  } catch (err) {
-    res.status(200).send('OK');
-  }
 };
+
+// Helper Function: Send Message
+async function sendMessage(chatId, text, replyMarkup) {
+    await axios.post(telegramUrl, {
+        chat_id: chatId,
+        text: text,
+        parse_mode: 'HTML',
+        reply_markup: replyMarkup
+    });
+}
+
+// Custom Keyboard Layout
+function mainKeyboard() {
+    return {
+        keyboard: [
+            [{ text: '👤 Profile' }, { text: '👫 Refer & Earn' }],
+            [{ text: '📝 Tasks' }, { text: '🏦 Withdraw' }]
+        ],
+        resize_keyboard: true
+    };
+}
