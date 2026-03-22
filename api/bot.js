@@ -1,139 +1,156 @@
-const { Telegraf } = require('telegraf');
-const { db } = require('../firebase.js');
+const axios = require('axios');
+const admin = require('firebase-admin');
 
-const bot = new Telegraf(process.env.BOT_TOKEN);
-
-// Helper: Get or create user
-async function getUser(userId) {
-  const userRef = db.collection('users').doc(userId.toString());
-  const doc = await userRef.get();
-  
-  if (!doc.exists) {
-    await userRef.set({
-      points: 10, // Welcome bonus for new user
-      referrals: 0,
-      lastDaily: 0,
-      createdAt: new Date()
-    });
-    return { points: 10, referrals: 0, lastDaily: 0 };
-  }
-  
-  return doc.data();
-}
-
-// Helper: Update points
-async function updatePoints(userId, addPoints) {
-  const userRef = db.collection('users').doc(userId.toString());
-  await userRef.update({
-    points: admin.firestore.FieldValue.increment(addPoints)
-  });
-}
-
-// Welcome + Start (with referral support)
-bot.start(async (ctx) => {
-  const userId = ctx.from.id;
-  const args = ctx.startPayload; // referral id if ?start=ref12345
-  let refId = null;
-  
-  if (args && args.startsWith('ref')) {
-    refId = args.replace('ref', '');
-  }
-
-  const user = await getUser(userId);
-
-  let message = `🌟 स्वागत है ${ctx.from.first_name}! India के सबसे तेज Earn Bot में!\n\n`;
-  message += `📱 रोज़ाना 10 Points Free\n`;
-  message += `🎥 15 सेकंड Ad देखो → 20 Points\n`;
-  message += `👥 दोस्त को शेयर करो → 50 Points हर referral पर!\n\n`;
-  message += `🚀 "काम करने वालों के लिए दुनिया खुली है!"\nAaj hi 5 दोस्तों को बुलाओ और withdraw शुरू करो!`;
-
-  if (refId && refId !== userId.toString()) {
-    // Referral valid hai?
-    const referrer = await getUser(refId);
-    if (referrer) {
-      await updatePoints(refId, 50);
-      await db.collection('users').doc(refId.toString()).update({
-        referrals: admin.firestore.FieldValue.increment(1)
-      });
-      await ctx.telegram.sendMessage(refId, `🎉 नया दोस्त आया! +50 Points मिले!`);
-      message += `\n\n🔥 Referral से Bonus: तुझे भी +20 Points मिले (new user welcome extra)`;
-      await updatePoints(userId, 20); // New user ko extra
+// Firebase Initialization (Vercel env var se)
+let db;
+try {
+  if (!admin.apps.length) {
+    const serviceAccountVar = process.env.FIREBASE_SERVICE_ACCOUNT;
+    if (!serviceAccountVar) {
+      throw new Error("FIREBASE_SERVICE_ACCOUNT env var missing!");
     }
+    // Replace \\n with actual new lines (Vercel multiline fix)
+    const serviceAccount = JSON.parse(serviceAccountVar.replace(/\\n/g, '\n'));
+    
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount)
+    });
+    console.log("Firebase Connected! ✅");
   }
+  db = admin.firestore();
+} catch (e) {
+  console.error("Firebase Init Error:", e.message);
+  // In production, you can still respond OK but log error
+}
 
-  const keyboard = [
-    [{ text: '👤 Profile', callback_data: 'profile' }],
-    [{ text: '🎁 Daily Bonus', callback_data: 'daily' }],
-    [{ text: '🎥 Watch Ad (20 pts)', callback_data: 'ad' }],
-    [{ text: '🔗 Refer & Earn', callback_data: 'refer' }],
-    [{ text: '🏦 Withdraw', callback_data: 'withdraw' }]
-  ];
+const BOT_TOKEN = process.env.BOT_TOKEN;  // Vercel env se lo, hardcoded mat rakho!
 
-  await ctx.replyWithMarkdown(message, {
-    reply_markup: { inline_keyboard: keyboard }
-  });
-
-  // Referral link generate
-  const refLink = `https://t.me/${ctx.botInfo.username}?start=ref${userId}`;
-  await db.collection('users').doc(userId.toString()).update({ refLink });
-});
-
-// Profile button
-bot.action('profile', async (ctx) => {
-  const user = await getUser(ctx.from.id);
-  await ctx.answerCbQuery();
-  await ctx.reply(`👤 तेरा Profile:\n\nPoints: ${user.points || 0}\nReferrals: ${user.referrals || 0}\nDaily last claim: ${new Date(user.lastDaily).toLocaleString()}`);
-});
-
-// Daily Bonus
-bot.action('daily', async (ctx) => {
-  const userId = ctx.from.id;
-  const user = await getUser(userId);
-  const now = Date.now();
-  const oneDay = 24 * 60 * 60 * 1000;
-
-  await ctx.answerCbQuery();
-
-  if (now - user.lastDaily < oneDay) {
-    const remaining = Math.ceil((oneDay - (now - user.lastDaily)) / 3600000);
-    return ctx.reply(`⏳ Daily Bonus already claimed! ${remaining} घंटे बाद फिर try करो।`);
+// Telegram API helper (reuse karne ke liye)
+async function sendMessage(chatId, text, replyMarkup = null) {
+  const payload = {
+    chat_id: chatId,
+    text: text,
+    parse_mode: 'HTML'
+  };
+  if (replyMarkup) {
+    payload.reply_markup = replyMarkup;
   }
+  try {
+    await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, payload);
+  } catch (err) {
+    console.error("SendMessage error:", err.message);
+  }
+}
 
-  await updatePoints(userId, 10);
-  await db.collection('users').doc(userId.toString()).update({ lastDaily: now });
-
-  ctx.reply('🎉 Daily 10 Points claim हो गए! 🔥');
-});
-
-// Ad placeholder (real mein Mini App shift kar lena)
-bot.action('ad', async (ctx) => {
-  await ctx.answerCbQuery();
-  await ctx.reply('🎥 Ad dekhne ke liye: https://your-ad-link.com (15s dekhne ke baad yaha wapas aa +20 points claim kar)\n\n[Placeholder: Real rewarded video Mini App mein integrate hoga]');
-  // Future: await updatePoints(ctx.from.id, 20); // after verification
-});
-
-// Refer
-bot.action('refer', async (ctx) => {
-  await ctx.answerCbQuery();
-  const userId = ctx.from.id;
-  const user = await getUser(userId);
-  const refLink = user.refLink || `https://t.me/${ctx.botInfo.username}?start=ref${userId}`;
-  
-  ctx.reply(`🔗 अपना referral link:\n${refLink}\n\nHar naye user pe +50 Points!\nZyada se zyada share karo! 🚀`);
-});
-
-// Withdraw placeholder
-bot.action('withdraw', async (ctx) => {
-  await ctx.answerCbQuery();
-  ctx.reply('🏦 Withdraw: Minimum 500 points chahiye.\nUPI / TON wallet add karne ka option jaldi aayega.\nAbhi under development hai!');
-});
-
-bot.launch().then(() => {
-  console.log('Bot started on Vercel');
-});
-
-// Vercel serverless handler
 module.exports = async (req, res) => {
-  await bot.handleUpdate(req.body, res);
-  res.status(200).end();
+  if (req.method !== 'POST') {
+    return res.status(200).send('Bot is Running... 🟢');
+  }
+
+  try {
+    const update = req.body;
+    if (!update.message || !update.message.text) {
+      return res.status(200).send('OK');
+    }
+
+    const message = update.message;
+    const chatId = message.chat.id.toString();
+    const text = message.text.trim();
+    const firstName = message.from.first_name || "User";
+
+    // Handle /start with optional referral param
+    if (text.startsWith('/start')) {
+      let inviteCode = null;
+      const parts = text.split(/\s+/);  // better split
+      if (parts.length > 1) {
+        inviteCode = parts[1];  // e.g. /start ref12345 → inviteCode = ref12345
+      }
+
+      const userRef = db.collection('users').doc(chatId);
+      const doc = await userRef.get();
+
+      let welcomeBonus = 0;
+      if (!doc.exists) {
+        // New user
+        welcomeBonus = 10;  // Optional welcome points
+        await userRef.set({
+          userId: chatId,
+          name: firstName,
+          points: welcomeBonus,
+          referrals: 0,
+          referredBy: inviteCode || null,
+          joinedAt: new Date().toISOString()
+        });
+
+        // Give referral bonus if valid
+        if (inviteCode && inviteCode !== chatId) {
+          const referrerRef = db.collection('users').doc(inviteCode);
+          const referrerDoc = await referrerRef.get();
+          if (referrerDoc.exists) {
+            await referrerRef.update({
+              points: admin.firestore.FieldValue.increment(50),
+              referrals: admin.firestore.FieldValue.increment(1)
+            });
+            // Optional: Notify referrer
+            await sendMessage(inviteCode, `🎉 Naya dost join hua! +50 Points mile!`);
+          }
+        }
+
+        // Give new user extra if referred
+        if (inviteCode) {
+          await userRef.update({
+            points: admin.firestore.FieldValue.increment(20)  // extra for new referred user
+          });
+        }
+      }
+
+      // Main welcome message with keyboard
+      const mainKeyboard = {
+        keyboard: [
+          [{ text: '👤 Profile' }, { text: '🔗 Refer Link' }],
+          [{ text: '🎁 Daily Bonus' }, { text: '🎥 Watch Ad' }],
+          [{ text: '🏦 Withdraw' }]
+        ],
+        resize_keyboard: true,
+        one_time_keyboard: false
+      };
+
+      let welcomeText = `<b>Namaste ${firstName}! 🙏</b>\n\nRefer & Earn Bot mein swagat hai!\n\n`;
+      welcomeText += `Roj 10 Points free daily bonus!\n15s Ad dekhne pe 20 Points\nHar referral pe 50 Points! 💰\n\nAaj hi doston ko bulao!`;
+
+      await sendMessage(chatId, welcomeText, mainKeyboard);
+    }
+
+    // Handle button clicks (text messages from keyboard)
+    else if (text === '🔗 Refer Link') {
+      const referLink = `https://t.me/${process.env.BOT_USERNAME || 'refer_earning_robot'}?start=${chatId}`;
+      await sendMessage(chatId, `<b>Aapka Referral Link:</b>\n\n${referLink}\n\nHar naye dost pe +50 Points! 🚀`);
+    }
+
+    else if (text === '👤 Profile') {
+      const userDoc = await db.collection('users').doc(chatId).get();
+      const points = userDoc.exists ? userDoc.data().points || 0 : 0;
+      const referrals = userDoc.exists ? userDoc.data().referrals || 0 : 0;
+      await sendMessage(chatId, `<b>👤 Aapka Profile</b>\n\nBalance: ${points} Points\nReferrals: ${referrals}`);
+    }
+
+    else if (text === '🎁 Daily Bonus') {
+      // Placeholder: Add your 24h claim logic here
+      await sendMessage(chatId, 'Daily Bonus coming soon! (24h cooldown logic add kar rahe hain)');
+    }
+
+    else if (text === '🎥 Watch Ad') {
+      // Placeholder for ad
+      await sendMessage(chatId, 'Ad link: https://your-ad-network.com (15s dekhne ke baad +20 points claim karo)');
+    }
+
+    else if (text === '🏦 Withdraw') {
+      await sendMessage(chatId, 'Withdraw minimum 500 points. UPI/TON jaldi add hoga!');
+    }
+
+  } catch (err) {
+    console.error("Bot Error:", err.message);
+  }
+
+  return res.status(200).send('OK');
 };
